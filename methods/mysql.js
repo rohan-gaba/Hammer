@@ -15,7 +15,7 @@ var config = {
   },
   options: {
     trustServerCertificate: true,
-    database: "CodeQuootient",
+    database: "Ecommerce",
   },
 
 };

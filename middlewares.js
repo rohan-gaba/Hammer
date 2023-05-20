@@ -1,4 +1,3 @@
-
 const fs = require('fs');
 var file = require('./methods/readfile');
 var database = require('./methods/mysql');
@@ -46,6 +45,7 @@ module.exports = {
           req.session.is_log = true;
           req.session.name = data[0].name;
           req.session.mail = data[0].mail;
+          req.session.role=data[0].role;
           req.session.sellerid = data[0].person_id;
           if (req.body.who == "0") {
             // res.redirect("/");
@@ -407,7 +407,7 @@ module.exports = {
       res.send("failure");
     })
   },
-  orders: function (req, res) {
+  place_orders: function (req, res) {
     database.conn().then(function (connection) {
       let stat = `select * from cart
       Declare @size int
@@ -421,13 +421,12 @@ module.exports = {
           select @product=product_id,@quantity=quantity,@cart_id=cart_id from cart  where user_id=${req.session.sellerid} order by cart_id  offset 0 rows fetch next 1 row only
           update products set quantity=quantity-@quantity where product_id=@product
           select @address=address from person where person_id=${req.session.sellerid}
-          insert into orders(user_id,product_id,address,quantity) values(3,@product,@address,@quantity)
+          insert into orders(user_id,product_id,address,quantity) values(${req.session.sellerid},@product,@address,@quantity)
           delete from cart where cart_id=@cart_id
           set @current=@current+1
         end`;
       database.begin_transaction(connection, stat).then(function () {
         res.send("order placed");
-        console.log("thk h");
       }).catch(function (err) {
         res.send("out of stock something");
       })
@@ -435,6 +434,69 @@ module.exports = {
       console.log(err);
       res.send("server down");
       console.log("error in connecting");
+    })
+  },
+  show_orders:function(req,res){
+     database.conn().then(function(connection){
+      let stat=`select count(date) as total,date,address from orders  where user_id=${req.session.sellerid} group by date,address`;
+      return database.getdata(connection,stat)
+     }).then(function(data)
+     {
+       res.render("orders",{orders:data,username:req.session.name});
+     }).catch(function(err){
+      console.log(err);
+      res.redirect("/");
+     })
+  },
+  full_order_details_date_wise: function(req,res)
+  {
+    database.conn().then(function(connection){
+      let stat=`select orders.address,orders.status,orders.quantity,products.price,person.name seller_name,products.name product_name,products.path from orders, products ,person where date='${req.body.date}' and user_id=${req.session.sellerid} and orders.product_id=products.product_id and products.seller_id=person.person_id`;
+      // console.log(stat);
+      return database.getdata(connection,stat)
+    }).then(function(data)
+    {
+      // console.log(data);
+      res.json(data);
+    }).catch(function(err)
+    {
+      res.send(err);
+    })
+  },
+  seller_orders: function(req,res)
+  {
+      database.conn().then(function(connection){
+        let stat=`select orders.address,orders.order_id,orders.status,orders.date,orders.quantity,products.name as product_name, person.name as buyer_name from products   inner join ( orders inner join person on orders.user_id=person.person_id) on products.product_id=orders.product_id  where products.seller_id=${req.session.sellerid}`;
+        return database.getdata(connection,stat);
+      }).then(function(data){
+         res.render("seller_orders",{orders:data,username:req.session.name});
+      })
+      .catch(function(error){
+        res.redirect("/admin");
+      })
+  },
+  change_order_status: function(req,res)
+  {
+    console.log(req.body.order_id,req.body.value);
+    database.conn().then(function(connection) {
+      let stat=`select status from orders where order_id=${req.body.order_id}`;
+      return database.getdata(connection,stat)
+    }).then(function(data){
+      let newdata=JSON.parse(data[0].status);
+      newdata.push(req.body.value);
+      database.conn().then(function(connection){
+        let abc=JSON.stringify(newdata);
+        let stat=`update orders set status='${abc}' where order_id=${req.body.order_id}`;
+        return database.add_data(connection,stat);
+      }).then(function()
+      {
+        res.send("success");
+      }).catch(function(error){
+        console.log(error);
+        res.send("failure");
+      })
+    }).catch(function(error){
+      res.send("failure");
     })
   }
 }

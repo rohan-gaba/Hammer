@@ -4,6 +4,7 @@ let total_item = document.getElementById("total_item");
 let address = document.getElementById("address");
 let save_address = document.getElementById("save_address");
 let edit_address = document.getElementById("edit_address");
+let confirm_address = document.getElementById("confirm_address");
 function get_address() {
     let request = new XMLHttpRequest();
     request.open("GET", "/get_user_details");
@@ -89,18 +90,34 @@ function remove_quantity(id) {
 
 
 function place_order() {
-    if (address.value.trim()) {
+    if (confirm_address.innerText.trim()) {
+        if(parent.childElementCount>0){
         let request = new XMLHttpRequest();
-        request.open("GET", "/orders");
+        request.open("POST", "/place_orders");
         request.send();
         request.addEventListener("load", function () {
-            console.log(request.responseText);
-        })
+            if(request.responseText=="order placed")
+            {
+                window.location.href="/orders";
+            }
+            else if(request.responseText=="out of stock something")
+            window.location.href="/showcart";
+            else
+            {
+                let error=document.getElementById("cart_error");
+                error.style.display="block";
+            }
+        })}
+        else{
+            alert("cart is empty");
+        }
+    }
+    else {
+        alert("Please save address first");
     }
 }
 
 function save_address1() {
-    let address = document.getElementById("address");
     if (address.value.trim()) {
         let request = new XMLHttpRequest();
         request.open("POST", "/save_address");
@@ -108,7 +125,6 @@ function save_address1() {
         request.send(JSON.stringify({ "address": address.value.trim() }));
         request.addEventListener("load", function () {
             if (request.responseText == "success") {
-                let confirm_address = document.getElementById("confirm_address");
                 confirm_address.innerText = address.value;
                 address.style.display = "none";
                 confirm_address.style.display = "block";
